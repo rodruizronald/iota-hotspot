@@ -1,0 +1,73 @@
+@font-face{
+
+	font-family: 'Abolition Regular';
+
+	src: url('../fonts/abolition-regular-webfont.eot');
+    src: url('../fonts/abolition-regular-webfont.eot?#iefix') format('embedded-opentype'),
+         url('../fonts/abolition-regular-webfont.woff') format('woff'),
+         url('../fonts/abolition-regular-webfont.ttf') format('truetype');
+
+}
+
+body
+{
+	color: rgba(255, 255, 255, 0.8);
+  	margin: 0;
+}
+
+h1
+{
+	font-size: 6rem;
+	color: rgba(255, 255, 255, 0.8);
+	font-weight: normal;
+	margin: 0;
+}
+
+h2
+{
+	font-family: 'Abolition Regular',sans-serif;
+	font-size: 7rem;
+	color: rgba(255, 255, 255, 0.8);
+	font-weight: normal;
+	margin: 0;
+}
+
+.main-header
+{
+	padding: 50px;
+	height: 500px;
+	text-align: center;
+	font-family: 'Abolition Regular',sans-serif;
+	background: linear-gradient(to top, #fff, transparent 25%),
+			    #fff url('../images/IOTA1.png') no-repeat center/cover;
+}
+
+#wrapper 
+{
+	max-width: 940px;
+	margin: 0 auto;
+	padding: 5% 5%;
+}
+
+#client-info 
+{
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#client-info li 
+{
+	float: left;
+	width: 45%;
+	margin: 2.5%;
+}
+
+#client-info li span
+{
+	font-family: 'Abolition Regular',sans-serif;
+	font-size: 3rem;
+	color: rgba(255, 255, 255, 0.8);
+	font-weight: normal;
+}
+

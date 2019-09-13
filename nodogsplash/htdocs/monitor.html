@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+	<head>	    
+	    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+		<meta http-equiv="Pragma" content="no-cache">
+		<meta http-equiv="Expires" content="0">
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<link rel="shortcut icon" href="images/IOTA1.png" type="image/x-icon">
+	    <link rel="stylesheet" type="text/css" href="css/monitor.css">
+	    <title>IOTA Monitor</title>
+	</head>
+	<body>
+		<div class="main-header">
+        	<h1>IOTA Hotspot - Client Monitor</h1>
+        		<div id="wrapper">
+        			<ul id="client-info">
+        			<li>
+        				<h2 id="tokens">-</h2>
+        				<span>MIOTA (Mi)</span>
+        			</li>
+        			<li>
+        				<h2 id="mbytes">-</h2>
+        				<span>Mbytes</span>
+        			</li>
+        			</ul>
+        		</div>
+    		</div>
+		<script>
+			setInterval(get_client_info, 10000);
+					
+			function get_client_info() 
+			{
+				var xhttp = new XMLHttpRequest();
+				xhttp.onreadystatechange = function() 
+				{
+					if (this.readyState == 4 && this.status == 200) 
+					{
+						parse_file(this);
+					}
+				};
+				xhttp.open("GET", "xml/client.xml", true);
+				xhttp.send();
+			}
+
+			function parse_file(xml) 
+			{
+				var xml_doc = xml.responseXML;
+				var tokens = xml_doc.getElementsByTagName("tokens")[0].childNodes[0].nodeValue;
+				var mbytes = xml_doc.getElementsByTagName("mbytes")[0].childNodes[0].nodeValue;
+				
+				document.getElementById("tokens").innerHTML = tokens;
+				document.getElementById("mbytes").innerHTML = mbytes;
+				
+				if (parseInt(tokens) === 0)
+				{
+					clearInterval(get_client_info); 
+					alert("You've run out of data!");
+				}
+			}
+		</script>
+	</body>
+</html>
+

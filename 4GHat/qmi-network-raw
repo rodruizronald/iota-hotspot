@@ -1,0 +1,166 @@
+#!/bin/sh
+
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 2 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 51
+# Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Copyright (C) 2012-2015 Aleksander Morgado <aleksander@aleksander.es>
+
+DEVICE=$1
+COMMAND=$2
+APN=$3
+
+STATE_FILE=/tmp/qmi-network-state
+
+save_state ()
+{
+    KEY=$1
+    VAL=$2
+
+    echo "Saving state at ${STATE_FILE}... ($KEY: $VAL)"
+
+    if [ -f "$STATE_FILE" ]; then
+        PREVIOUS=`cat $STATE_FILE`
+        PREVIOUS=`echo "$PREVIOUS" | grep -v $KEY`
+        if [ -n "$PREVIOUS" ]; then
+            echo $PREVIOUS > $STATE_FILE
+        else
+            rm $STATE_FILE
+        fi
+    fi
+
+    if [ -n "$VAL" ]; then
+        echo "$KEY=\"$VAL\"" >> $STATE_FILE
+    fi
+}
+
+load_state ()
+{
+    if [ -f "$STATE_FILE" ]; then
+        echo "Loading previous state from ${STATE_FILE}..."
+        . $STATE_FILE
+
+        if [ -n "$CID" ]; then
+            echo "    Previous CID: $CID"
+        fi
+        if [ -n "$PDH" ]; then
+            echo "    Previous PDH: $PDH"
+        fi
+    fi
+}
+
+clear_state ()
+{
+    echo "Clearing state at ${STATE_FILE}..."
+    rm -f $STATE_FILE
+}
+
+# qmicli -d /dev/cdc-wdm0 --wds-start-network --client-no-release-cid
+# [/dev/cdc-wdm0] Network started
+#   Packet data handle: 3634026241
+# [/dev/cdc-wdm0] Client ID not released:
+#   Service: 'wds'
+#       CID: '80'
+start_network ()
+{
+    # turn on the cellular radio
+    qmicli -d /dev/cdc-wdm0 --dms-set-operating-mode='online'
+    sleep 1
+
+    # reconfigure the network interface for raw-ip protocol
+    ifconfig wwan0 down
+    sleep 1
+    echo Y > /sys/class/net/wwan0/qmi/raw_ip
+    ifconfig wwan0 up
+    sleep 1
+
+    START_NETWORK_ARGS="ip-type=4"
+    if [ ! -z "$APN" ]; then
+        START_NETWORK_ARGS="apn='$APN',ip-type=4"
+    fi
+
+    START_NETWORK_CMD="qmicli -d $DEVICE --device-open-net=net-raw-ip|net-no-qos-header --wds-start-network=$START_NETWORK_ARGS --client-no-release-cid"
+    echo "Starting network with '$START_NETWORK_CMD'..."
+
+    START_NETWORK_OUT=`$START_NETWORK_CMD`
+
+    # Save the new CID if we didn't use any before
+    if [ -z "$CID" ]; then
+        CID=`echo "$START_NETWORK_OUT" | sed -n "s/.*CID.*'\(.*\)'.*/\1/p"`
+        if [ -z "$CID" ]; then
+            echo "error: network start failed, client not allocated" 1>&2
+            exit 1
+        else
+            save_state "CID" $CID
+        fi
+    fi
+
+    PDH=`echo "$START_NETWORK_OUT" | sed -n "s/.*handle.*'\(.*\)'.*/\1/p"`
+    if [ -z "$PDH" ]; then
+        echo "error: network start failed, no packet data handle" 1>&2
+        # Cleanup the client
+        qmicli -d "$DEVICE" --wds-noop --client-cid="$CID"
+        clear_state
+        exit 2
+    else
+        save_state "PDH" $PDH
+    fi
+
+    echo "Network started successfully"
+}
+
+# qmicli -d /dev/cdc-wdm0 --wds-stop-network
+stop_network ()
+{
+    if [ -z "$CID" ]; then
+        echo "Network already stopped"
+    elif [ -z "$PDH" ]; then
+        echo "Network already stopped; need to cleanup CID $CID"
+        # Cleanup the client
+        qmicli -d "$DEVICE" --wds-noop --client-cid="$CID"
+    else
+        STOP_NETWORK_CMD="qmicli -d $DEVICE --wds-stop-network=$PDH --client-cid=$CID"
+        echo "Stopping network with '$STOP_NETWORK_CMD'..."
+
+        STOP_NETWORK_OUT=`$STOP_NETWORK_CMD`
+
+        ifconfig wwan0 down
+
+        # turn off the cellular radio
+        qmicli -d /dev/cdc-wdm0 --dms-set-operating-mode='low-power'
+
+	echo "Network stopped successfully"
+    fi
+
+    clear_state
+}
+
+# Load previous state, if any
+load_state
+
+# Process commands
+case $COMMAND in
+    "start")
+        start_network
+        ;;
+    "stop")
+        stop_network
+        ;;
+    *)
+        echo "error: unexpected command '$COMMAND'" 1>&2
+        print_usage
+        exit 255
+        ;;
+esac
+
+exit 0
